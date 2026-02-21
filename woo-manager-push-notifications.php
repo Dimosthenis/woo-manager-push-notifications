@@ -21,6 +21,7 @@ $wooManagerUpdateChecker = PucFactory::buildUpdateChecker(
     'woo-manager-push-notifications'
 );
 $wooManagerUpdateChecker->setBranch('main');
+$wooManagerUpdateChecker->getVcsApi()->enableReleaseAssets();
 
 // ── Cloud Function endpoint ─────────────────────────────────
 define('WOO_MANAGER_API_URL', 'https://us-central1-woomanager-8557f.cloudfunctions.net');
