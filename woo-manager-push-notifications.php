@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Woo Manager Push Notifications
  * Description: Sends push notifications to Woo Manager App via central backend when a new order is received.
- * Version: 1.0.1
+ * Version: 1.1.0
  * Author: Dimosthenis Nikolis
  */
 
@@ -49,6 +49,58 @@ function woo_manager_register_settings()
     ]);
 }
 
+function woo_manager_get_system_checks()
+{
+    $checks = [];
+
+    // WooCommerce active
+    $checks[] = [
+        'label' => 'WooCommerce',
+        'passed' => class_exists('WooCommerce'),
+        'message' => class_exists('WooCommerce') ? 'Active' : 'Not detected',
+        'help_url' => 'https://wordpress.org/plugins/woocommerce/',
+    ];
+
+    // PHP 7.4+
+    $php_ok = version_compare(PHP_VERSION, '7.4', '>=');
+    $checks[] = [
+        'label' => 'PHP Version',
+        'passed' => $php_ok,
+        'message' => 'PHP ' . PHP_VERSION,
+        'help_url' => 'https://www.php.net/supported-versions.php',
+    ];
+
+    // SSL / HTTPS
+    $checks[] = [
+        'label' => 'SSL / HTTPS',
+        'passed' => is_ssl(),
+        'message' => is_ssl() ? 'Enabled' : 'Not detected',
+        'help_url' => 'https://developer.wordpress.org/advanced-administration/security/https/',
+    ];
+
+    // REST API accessible
+    $rest_url = get_rest_url();
+    $rest_blocked = has_filter('rest_authentication_errors');
+    $rest_ok = !empty($rest_url) && !$rest_blocked;
+    $checks[] = [
+        'label' => 'REST API',
+        'passed' => $rest_ok,
+        'message' => $rest_ok ? 'Accessible' : 'Blocked or unavailable',
+        'help_url' => 'https://developer.wordpress.org/rest-api/',
+    ];
+
+    // API key configured
+    $has_key = !empty(get_option('woo_manager_api_key', ''));
+    $checks[] = [
+        'label' => 'API Key',
+        'passed' => $has_key,
+        'message' => $has_key ? 'Configured' : 'Not set',
+        'help_url' => 'https://Dimosthenis.github.io/woomanager/getting-started/api-keys/',
+    ];
+
+    return $checks;
+}
+
 function woo_manager_settings_page_html()
 {
     if (!current_user_can('manage_options')) {
@@ -56,6 +108,8 @@ function woo_manager_settings_page_html()
     }
 
     $api_key = get_option('woo_manager_api_key', '');
+    $checks = woo_manager_get_system_checks();
+    $all_passed = !in_array(false, array_column($checks, 'passed'), true);
     $status_html = '';
 
     if (!empty($api_key)) {
@@ -90,28 +144,137 @@ function woo_manager_settings_page_html()
     }
 
     ?>
-    <div class="wrap">
-        <h1>Woo Manager Settings</h1>
-        <form method="post" action="options.php">
-            <?php settings_fields('woo_manager_settings'); ?>
-            <table class="form-table">
-                <tr>
-                    <th scope="row"><label for="woo_manager_api_key">API Key</label></th>
-                    <td>
-                        <input type="text" id="woo_manager_api_key" name="woo_manager_api_key"
-                            value="<?php echo esc_attr($api_key); ?>" class="regular-text" />
-                        <p class="description">
-                            <?php if (empty($api_key)): ?>
-                                Enter the API key from the Woo Manager app to enable push notifications.
-                            <?php else: ?>
-                                <?php echo wp_kses_post($status_html); ?>
-                            <?php endif; ?>
-                        </p>
-                    </td>
-                </tr>
-            </table>
-            <?php submit_button(); ?>
-        </form>
+    <style>
+        .wm-wrap { max-width: 700px; }
+        .wm-card {
+            background: #fff;
+            border: 1px solid #c3c4c7;
+            border-radius: 4px;
+            padding: 20px 24px;
+            margin-bottom: 20px;
+        }
+        .wm-card h2 {
+            margin: 0 0 16px;
+            padding: 0;
+            font-size: 15px;
+            font-weight: 600;
+            color: #1d2327;
+        }
+        .wm-checks {
+            list-style: none;
+            margin: 0;
+            padding: 0;
+        }
+        .wm-checks li {
+            padding: 8px 0;
+            border-bottom: 1px solid #f0f0f1;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+        .wm-checks li:last-child { border-bottom: none; }
+        .wm-check-icon {
+            flex-shrink: 0;
+            width: 20px;
+            text-align: center;
+            font-size: 15px;
+        }
+        .wm-check-pass .wm-check-icon { color: #00a32a; }
+        .wm-check-fail .wm-check-icon { color: #d63638; }
+        .wm-check-label { font-weight: 500; min-width: 120px; }
+        .wm-check-message { color: #50575e; }
+        .wm-check-help { margin-left: auto; }
+        .wm-check-help a { text-decoration: none; font-size: 12px; }
+        .wm-status-bar {
+            margin-top: 12px;
+            padding: 10px 14px;
+            border-radius: 3px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        .wm-status-bar-pass {
+            background: #edfaef;
+            border: 1px solid #00a32a;
+            color: #00a32a;
+        }
+        .wm-status-bar-fail {
+            background: #fcf0f1;
+            border: 1px solid #d63638;
+            color: #d63638;
+        }
+        .wm-field-row { margin-bottom: 16px; }
+        .wm-field-row label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+        .wm-field-row .description { margin-top: 8px; }
+        .wm-links {
+            display: flex;
+            gap: 24px;
+            font-size: 13px;
+        }
+        .wm-links a { text-decoration: none; }
+        .wm-links a:hover { text-decoration: underline; }
+    </style>
+
+    <div class="wrap wm-wrap">
+        <h1>Woo Manager</h1>
+
+        <!-- Card A: System Status -->
+        <div class="wm-card">
+            <h2>System Status</h2>
+            <ul class="wm-checks">
+                <?php foreach ($checks as $check): ?>
+                    <li class="<?php echo $check['passed'] ? 'wm-check-pass' : 'wm-check-fail'; ?>">
+                        <span class="wm-check-icon"><?php echo $check['passed'] ? '&#10003;' : '&#10007;'; ?></span>
+                        <span class="wm-check-label"><?php echo esc_html($check['label']); ?></span>
+                        <span class="wm-check-message"><?php echo esc_html($check['message']); ?></span>
+                        <?php if (!$check['passed']): ?>
+                            <span class="wm-check-help">
+                                <a href="<?php echo esc_url($check['help_url']); ?>" target="_blank" rel="noopener">Fix &rarr;</a>
+                            </span>
+                        <?php endif; ?>
+                    </li>
+                <?php endforeach; ?>
+            </ul>
+            <?php if ($all_passed): ?>
+                <div class="wm-status-bar wm-status-bar-pass">&#10003; All checks passed</div>
+            <?php else: ?>
+                <div class="wm-status-bar wm-status-bar-fail">&#10007; Some checks need attention</div>
+            <?php endif; ?>
+        </div>
+
+        <!-- Card B: Push Notifications -->
+        <div class="wm-card">
+            <h2>Push Notifications</h2>
+            <form method="post" action="options.php">
+                <?php settings_fields('woo_manager_settings'); ?>
+                <div class="wm-field-row">
+                    <label for="woo_manager_api_key">API Key</label>
+                    <input type="text" id="woo_manager_api_key" name="woo_manager_api_key"
+                        value="<?php echo esc_attr($api_key); ?>" class="regular-text" />
+                    <p class="description">
+                        <?php if (empty($api_key)): ?>
+                            Enter the API key from the Woo Manager app to enable push notifications.
+                        <?php else: ?>
+                            <?php echo wp_kses_post($status_html); ?>
+                        <?php endif; ?>
+                    </p>
+                </div>
+                <?php submit_button('Save API Key'); ?>
+            </form>
+        </div>
+
+        <!-- Card C: Links -->
+        <div class="wm-card">
+            <div class="wm-links">
+                <a href="https://Dimosthenis.github.io/woomanager/" target="_blank" rel="noopener">Documentation &rarr;</a>
+                <a href="https://Dimosthenis.github.io/woomanager/troubleshooting/" target="_blank" rel="noopener">Need help? &rarr;</a>
+            </div>
+        </div>
     </div>
     <?php
 }
