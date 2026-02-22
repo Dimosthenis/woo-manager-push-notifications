@@ -88,12 +88,11 @@ function woo_manager_get_system_checks()
 
     // REST API accessible
     $rest_url = get_rest_url();
-    $rest_blocked = has_filter('rest_authentication_errors');
-    $rest_ok = !empty($rest_url) && !$rest_blocked;
+    $rest_ok = !empty($rest_url);
     $checks[] = [
         'label' => 'REST API',
         'passed' => $rest_ok,
-        'message' => $rest_ok ? 'Accessible' : 'Blocked or unavailable',
+        'message' => $rest_ok ? 'Available' : 'Unavailable',
         'help_url' => 'https://developer.wordpress.org/rest-api/',
     ];
 
