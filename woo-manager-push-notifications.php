@@ -22,6 +22,14 @@ $wooManagerUpdateChecker = PucFactory::buildUpdateChecker(
 );
 $wooManagerUpdateChecker->setBranch('main');
 $wooManagerUpdateChecker->getVcsApi()->enableReleaseAssets();
+$wooManagerUpdateChecker->addResultFilter(function ($pluginInfo) {
+    $icon_url = plugin_dir_url(__FILE__) . 'assets/icon.png';
+    $pluginInfo->icons = [
+        '1x'      => $icon_url,
+        'default' => $icon_url,
+    ];
+    return $pluginInfo;
+});
 
 // ── Cloud Function endpoint ─────────────────────────────────
 define('WOO_MANAGER_API_URL', 'https://us-central1-woomanager-8557f.cloudfunctions.net');
